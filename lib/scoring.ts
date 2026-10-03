@@ -39,11 +39,15 @@ export function score(mode: "profile" | "repo", s: Signals) {
   const raw: Record<string, number> =
     mode === "profile"
       ? {
-          activity: 0.6 * sat(s.recentRepos, 6) + 0.4 * sat(s.repos, K.repos),
+          activity: s.hasContrib
+            ? 0.3 * sat(s.recentRepos, 6) + 0.1 * sat(s.repos, K.repos) + 0.6 * sat(s.commits + 3 * s.prs + 2 * s.reviews + s.issues, 900)
+            : 0.6 * sat(s.recentRepos, 6) + 0.4 * sat(s.repos, K.repos),
           impact: 0.7 * sat(s.stars, K.stars) + 0.3 * sat(s.forks, K.forks),
           engineering: 0.4 * sat(s.languages, K.languages) + 0.6 * s.hygiene * 100,
-          community: sat(s.followers, K.followers),
-          consistency: 0.7 * sat(s.ageYears, K.age) + 0.3 * sat(s.recentRepos, 4),
+          community: s.hasContrib ? 0.8 * sat(s.followers, K.followers) + 0.2 * sat(s.reviews, 60) : sat(s.followers, K.followers),
+          consistency: s.hasContrib
+            ? 0.4 * sat(s.ageYears, K.age) + 0.6 * clamp((s.activeWeeks / 52) * 100)
+            : 0.7 * sat(s.ageYears, K.age) + 0.3 * sat(s.recentRepos, 4),
         }
       : {
           activity: sat(s.recencyDays < 0 ? 0 : 365 / (1 + s.recencyDays), 40),

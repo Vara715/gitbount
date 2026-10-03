@@ -7,3 +7,7 @@ export interface BountyResult {
   bounty: number; score: number; tier: Tier; categories: Category[];
   stats: { label: string; value: string }[]; generatedAt: string;
 }
+export interface BoardEntry {
+  handle: string; name: string; mode: Mode; bounty: number; tier: string; tierColor: string;
+  score: number; activity: number; at: string;
+}

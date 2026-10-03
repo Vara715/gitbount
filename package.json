@@ -1,4 +1,4 @@
-{"name":"github-bounty","version":"0.1.0","private":true,
-"scripts":{"dev":"next dev","build":"next build","start":"next start"},
+{"name":"github-bounty","version":"0.2.0","private":true,
+"scripts":{"dev":"next dev","build":"next build","start":"next start","test":"tsx --test lib/scoring.test.ts","typecheck":"tsc --noEmit"},
 "dependencies":{"next":"^14.2.0","react":"^18.3.0","react-dom":"^18.3.0"},
-"devDependencies":{"typescript":"^5.4.0","@types/node":"^20","@types/react":"^18","@types/react-dom":"^18"}}
+"devDependencies":{"typescript":"^5.4.0","tsx":"^4.7.0","@types/node":"^20","@types/react":"^18","@types/react-dom":"^18"}}

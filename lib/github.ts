@@ -25,10 +25,25 @@ async function gh<T>(path: string): Promise<T> {
 
 async function avatarData(url: string): Promise<string> {
   try {
-    const r = await fetch(url + (url.includes("?") ? "&" : "?") + "s=400", { signal: AbortSignal.timeout(5000) });
+    const r = await fetch(url + (url.includes("?") ? "&" : "?") + "s=800", { signal: AbortSignal.timeout(5000) });
     const buf = Buffer.from(await r.arrayBuffer());
     return `data:${r.headers.get("content-type") || "image/png"};base64,${buf.toString("base64")}`;
   } catch { return ""; } // poster falls back to a silhouette
+}
+/** Optional GraphQL contribution signals (need GITHUB_TOKEN). Failure is non-fatal. */
+async function contributions(login: string) {
+  const token = process.env.GITHUB_TOKEN; if (!token) return null;
+  try {
+    const res = await fetch("https://api.github.com/graphql", {
+      method: "POST", signal: AbortSignal.timeout(8000),
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "User-Agent": "github-bounty" },
+      body: JSON.stringify({ query: `query($l:String!){user(login:$l){contributionsCollection{totalCommitContributions totalPullRequestContributions totalIssueContributions totalPullRequestReviewContributions contributionCalendar{weeks{contributionDays{contributionCount}}}}}}`, variables: { l: login } }),
+    });
+    const c = (await res.json())?.data?.user?.contributionsCollection; if (!c) return null;
+    const weeks: any[] = c.contributionCalendar.weeks;
+    const active = weeks.filter((w) => w.contributionDays.some((d: any) => d.contributionCount > 0)).length;
+    return { commits: c.totalCommitContributions, prs: c.totalPullRequestContributions, issues: c.totalIssueContributions, reviews: c.totalPullRequestReviewContributions, activeWeeks: (active / Math.max(1, weeks.length)) * 52 };
+  } catch { return null; }
 }
 const yrs = (d: string) => (Date.now() - new Date(d).getTime()) / (365.25 * 864e5);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -49,20 +64,26 @@ export async function buildBounty(raw: string): Promise<BountyResult> {
   const bid = (s: string) => "B-" + [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36).toUpperCase().padStart(7, "0");
 
   if (p.mode === "profile") {
-    const [u, repos] = await Promise.all([
+    const [u, repos, con] = await Promise.all([
       gh<any>(`/users/${p.owner}`),
       gh<any[]>(`/users/${p.owner}/repos?per_page=100&sort=pushed`),
+      contributions(p.owner),
     ]);
     const own = repos.filter((r) => !r.fork);
     const langs = new Set(own.map((r) => r.language).filter(Boolean));
     const recent = own.filter((r) => Date.now() - new Date(r.pushed_at).getTime() < 180 * 864e5).length;
     const stars = own.reduce((a, r) => a + r.stargazers_count, 0), forks = own.reduce((a, r) => a + r.forks_count, 0);
     const hyg = own.length ? own.filter((r) => r.description && r.license).length / own.length : 0;
-    const s: Signals = { stars, forks, followers: u.followers, repos: own.length, recentRepos: recent, languages: langs.size, hygiene: hyg, ageYears: yrs(u.created_at) };
+    const s: Signals = { stars, forks, followers: u.followers, repos: own.length, recentRepos: recent, languages: langs.size, hygiene: hyg, ageYears: yrs(u.created_at),
+      hasContrib: con ? 1 : 0, commits: con?.commits ?? 0, prs: con?.prs ?? 0, issues: con?.issues ?? 0, reviews: con?.reviews ?? 0, activeWeeks: con?.activeWeeks ?? 0 };
     const r = score("profile", s);
+    const years = yrs(u.created_at).toFixed(1);
+    const statRows = con
+      ? [["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["COMMITS 1Y", fmt(con.commits)], ["PULL REQUESTS", fmt(con.prs)], ["YEARS AT SEA", years]]
+      : [["REPOS", fmt(own.length)], ["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["LANGUAGES", fmt(langs.size)], ["YEARS AT SEA", years]];
     return { mode: "profile", id: bid(u.login), name: u.name || u.login, handle: u.login, url: u.html_url, avatar: await avatarData(u.avatar_url),
       bounty: r.bounty, score: r.total, tier: r.tier, categories: r.categories, generatedAt: now,
-      stats: [["REPOS", fmt(own.length)], ["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["LANGUAGES", fmt(langs.size)], ["YEARS AT SEA", yrs(u.created_at).toFixed(1)]].map(([label, value]) => ({ label, value })) };
+      stats: statRows.map(([label, value]) => ({ label, value })) };
   }
 
   const [r, langs, rel, contrib] = await Promise.all([
