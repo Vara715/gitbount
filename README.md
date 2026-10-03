@@ -1,7 +1,7 @@
 # GITHUB BOUNTY
 Turn a GitHub profile (`@user`) or repository (`owner/repo`) into a wanted poster.
 
-![GitBount sample Poster](posters/bounty-Vara715%20(1).png)
+<img src="posters/bounty-Vara715%20(1).png" width="300" alt="GitBount sample Poster">
 
 ## Run locally
 ```
