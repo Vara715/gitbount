@@ -15,7 +15,7 @@ priced by a transparent, explainable scoring engine.
 
 <img src="posters/bounty-Vara715 (1).png" width="360" alt="Example bounty poster">
 
-**[Live site](https://gitbount.vercel.app/)** · **[How it works](#-how-the-bounty-is-calculated)** · **[Deploy](#-deploy)**
+**[Live site](https://gitbount.vercel.app/)** · **[How it works](https://gitbount.vercel.app/how-it-works)**
 
 </div>
 
