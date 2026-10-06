@@ -74,8 +74,15 @@ async function listFile(sort: Sort, limit: number) {
 
 /* ---------- public API (best-effort: storage failures never break a bounty) ---------- */
 export async function saveBounty(r: BountyResult) {
-  try { const e = toEntry(r); redis ? await saveRedis(redis, e) : await saveFile(e); } catch { /* ignore */ }
+  try { const e = toEntry(r); redis ? await saveRedis(redis, e) : await saveFile(e); } catch (err) { console.error("[store] save failed:", err); }
 }
 export async function listBounties(sort: Sort = "highest", limit = 24): Promise<BoardEntry[]> {
-  try { return redis ? await listRedis(redis, sort, limit) : await listFile(sort, limit); } catch { return []; }
+  try { return redis ? await listRedis(redis, sort, limit) : await listFile(sort, limit); } catch (err) { console.error("[store] list failed:", err); return []; }
+}
+
+/** For /api/health: which backend is active and whether it responds. Never returns secrets. */
+export async function storageStatus() {
+  if (!redis) return { backend: "file", ok: false, note: "Upstash env vars not found, using local/tmp JSON file (not persistent on Vercel)" };
+  try { await redis.ping(); return { backend: "redis", ok: true, entries: await redis.zcard(Z.recent) }; }
+  catch (e) { return { backend: "redis", ok: false, error: String((e as Error).message).slice(0, 160) }; }
 }
