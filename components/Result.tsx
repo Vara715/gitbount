@@ -5,6 +5,8 @@ import { Poster, PosterBack } from "./Poster";
 import { Counter } from "./Counter";
 import { posterPng, posterSvg } from "@/lib/exportPoster";
 
+const short = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : String(n));
+
 export function Result({ r, onReset }: { r: BountyResult; onReset?: () => void }) {
   const [flip, setFlip] = useState(false); const [msg, setMsg] = useState(""); const [busy, setBusy] = useState(false);
   const front = useRef<SVGSVGElement>(null), back = useRef<SVGSVGElement>(null), tilt = useRef<HTMLDivElement>(null);
@@ -23,6 +25,7 @@ export function Result({ r, onReset }: { r: BountyResult; onReset?: () => void }
     const el = tilt.current; if (!el) return; const b = el.getBoundingClientRect();
     const x = (e.clientX - b.left) / b.width - .5, y = (e.clientY - b.top) / b.height - .5;
     el.style.transform = `rotateY(${x * 9}deg) rotateX(${-y * 9}deg)`; el.style.setProperty("--sx", `${-x * 40}px`); el.style.setProperty("--sy", `${-y * 40 + 30}px`);
+    el.style.setProperty("--px", `${-x * 14}px`); el.style.setProperty("--py", `${-y * 14}px`);
   };
   return (
     <section className="result">
@@ -43,6 +46,7 @@ export function Result({ r, onReset }: { r: BountyResult; onReset?: () => void }
         <p className="big serif"><Counter to={r.bounty} /></p>
         <span className="tier serif" style={{ color: r.tier.color }}>{r.tier.name}</span> <b className="mono">SCORE {r.score}</b>
         <p><em>{r.tier.description}</em></p>
+        {r.rarity && <p className="mono hint">Top {r.rarity.topPercent}% of {r.rarity.total.toLocaleString("en-US")} bounties on the board</p>}
         <div className="actions">
           <button className="cta" onClick={png} disabled={busy}>{busy ? "PRINTING…" : "DOWNLOAD POSTER"}</button>
           <button className="cta ghost" onClick={svg}>SVG</button>
@@ -53,6 +57,10 @@ export function Result({ r, onReset }: { r: BountyResult; onReset?: () => void }
         </div>
         <p className="toast" role="status">{msg}</p>
         <h3 className="serif">WHY THIS BOUNTY?</h3>
+        <ul className="ledger">{[...r.categories].sort((a, b) => b.share - a.share).map((c, i) => (
+          <li key={c.key}><span className="mono plus">+ {short(c.share)}</span><span className="lbl">{c.label}</span>
+            <span className="stars" aria-label={`${Math.round(c.score / 10)} out of 10`}>{"★".repeat(Math.round(c.score / 10))}{"☆".repeat(10 - Math.round(c.score / 10))}</span>
+            <div className="bar"><i style={{ width: `${(c.share / Math.max(1, ...r.categories.map((x) => x.share))) * 100}%`, animationDelay: `${0.3 + i * 0.12}s` }} /></div></li>))}</ul>
         {r.categories.map((c) => (
           <details key={c.key}><summary><span>{c.label}</span><span>{c.score}</span></summary>
             <div className="bar"><i style={{ width: `${c.score}%` }} /></div>

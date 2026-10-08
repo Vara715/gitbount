@@ -60,7 +60,7 @@ export function Poster({ r, svgRef }: { r: BountyResult; svgRef?: React.Ref<SVGS
         <g clipPath="url(#pic)">
           <rect x="68" y="262" width="664" height="488" fill="#a89570"/>
           {r.avatar
-            ? <image href={r.avatar} x="68" y="262" width="664" height="488" preserveAspectRatio="xMidYMid slice"/>
+            ? <g className="plx"><image href={r.avatar} x="54" y="248" width="692" height="516" preserveAspectRatio="xMidYMid slice"/></g>
             : <g fill="#5b4630"><ellipse cx="400" cy="720" rx="190" ry="150"/><circle cx="400" cy="470" r="92"/><path d="M290 440 Q400 300 510 440 Q400 410 290 440Z"/></g>}
           <rect x="68" y="262" width="664" height="488" fill="#c79a52" opacity=".16" style={{ mixBlendMode: "multiply" }}/>
           <rect x="68" y="262" width="664" height="488" fill="url(#grade)"/>
@@ -73,7 +73,7 @@ export function Poster({ r, svgRef }: { r: BountyResult; svgRef?: React.Ref<SVGS
           <text x="94" y="1020" fontSize="82" fontWeight="900">B</text>
           <rect x="116" y="940" width="7" height="22"/><rect x="116" y="1010" width="7" height="22"/>
         </g>
-        <text x="178" y="1018" fontSize={digSize} fontWeight="500" fontFamily="'Quicksand','Nunito',sans-serif" letterSpacing={LS * digSize}>{amount}</text>
+        <text x="178" y="1018" fontSize={digSize} fontWeight="500" fontFamily="'Quicksand','Nunito',sans-serif" letterSpacing={LS * digSize} className="glow">{amount}</text>
         <g fontFamily="'Special Elite','Courier New',monospace" fontSize="11">
           <text x="110" y="1046">{line(0, 2)}</text><text x="110" y="1059">{line(2, 4)}</text><text x="110" y="1072">{line(4, 6)}</text>
           <text x="110" y="1085">github.com/{r.handle.slice(0, 34)}</text>

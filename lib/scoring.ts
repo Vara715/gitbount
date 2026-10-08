@@ -5,7 +5,7 @@ export const SCORING_CONFIG = {
   // bounty = BASE * 10^(score * EXPONENT): score 0 -> 1M, score 100 -> ~3.2B
   bountyBase: 1_000_000, bountyExponent: 0.035,
   // saturation constants: value at which a signal earns ~63% of its points
-  k: { stars: 400, forks: 120, followers: 300, repos: 25, age: 6, languages: 5, watchers: 150, releases: 15, contributors: 30 },
+  k: { stars: 400, forks: 120, followers: 300, repos: 25, age: 6, languages: 5, watchers: 150, releases: 15, contributors: 30, contribs: 400 },
 };
 export const TIERS: Tier[] = [
   { name: "UNKNOWN", min: 0, color: "#8a7a62", description: "Barely a whisper on the open-source seas." },
@@ -39,15 +39,11 @@ export function score(mode: "profile" | "repo", s: Signals) {
   const raw: Record<string, number> =
     mode === "profile"
       ? {
-          activity: s.hasContrib
-            ? 0.3 * sat(s.recentRepos, 6) + 0.1 * sat(s.repos, K.repos) + 0.6 * sat(s.commits + 3 * s.prs + 2 * s.reviews + s.issues, 900)
-            : 0.6 * sat(s.recentRepos, 6) + 0.4 * sat(s.repos, K.repos),
+          activity: 0.3 * sat(s.recentRepos, 6) + 0.1 * sat(s.repos, K.repos) + 0.6 * sat(s.commits + 3 * s.prs + 2 * s.reviews + s.issues, K.contribs),
           impact: 0.7 * sat(s.stars, K.stars) + 0.3 * sat(s.forks, K.forks),
           engineering: 0.4 * sat(s.languages, K.languages) + 0.6 * s.hygiene * 100,
-          community: s.hasContrib ? 0.8 * sat(s.followers, K.followers) + 0.2 * sat(s.reviews, 60) : sat(s.followers, K.followers),
-          consistency: s.hasContrib
-            ? 0.4 * sat(s.ageYears, K.age) + 0.6 * clamp((s.activeWeeks / 52) * 100)
-            : 0.7 * sat(s.ageYears, K.age) + 0.3 * sat(s.recentRepos, 4),
+          community: 0.8 * sat(s.followers, K.followers) + 0.2 * sat(s.reviews, 60),
+          consistency: 0.4 * sat(s.ageYears, K.age) + 0.6 * clamp((s.activeWeeks / 52) * 100),
         }
       : {
           activity: sat(s.recencyDays < 0 ? 0 : 365 / (1 + s.recencyDays), 40),

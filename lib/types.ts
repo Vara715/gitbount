@@ -6,6 +6,7 @@ export interface BountyResult {
   mode: Mode; id: string; name: string; handle: string; url: string; avatar: string;
   bounty: number; score: number; tier: Tier; categories: Category[];
   stats: { label: string; value: string }[]; generatedAt: string;
+  rarity?: { topPercent: number; total: number }; // only when the board has enough data
 }
 export interface BoardEntry {
   handle: string; name: string; mode: Mode; bounty: number; tier: string; tierColor: string;

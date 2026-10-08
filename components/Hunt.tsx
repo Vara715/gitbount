@@ -9,6 +9,13 @@ const ERRORS: Record<string, string> = {
   TIMEOUT: "THE SEAS ARE TOO CALM", UPSTREAM: "SOMETHING WENT OVERBOARD",
 };
 
+/** 1 → 10 → 100 → … flicker shown while the bounty is being calculated. */
+function Ticker() {
+  const [k, setK] = useState(0);
+  useEffect(() => { const t = setInterval(() => setK((x) => (x + 1) % 10), 90); return () => clearInterval(t); }, []);
+  return <p className="ticker serif" aria-hidden="true">฿ {(10 ** k).toLocaleString("en-US")}</p>;
+}
+
 export function Hunt({ children }: { children?: React.ReactNode }) {
   const [q, setQ] = useState(""); const [kind, setKind] = useState<"profile" | "repo">("profile");
   const [stage, setStage] = useState(-1); const [res, setRes] = useState<BountyResult | null>(null);
@@ -51,6 +58,7 @@ export function Hunt({ children }: { children?: React.ReactNode }) {
       </form>
       <p className="hint">Analyze activity. Measure impact. Claim your bounty.</p>
       {busy && <ol className="seq" aria-live="polite">{STAGES.map((s, i) => <li key={s} className={i < stage ? "done" : i === stage ? "on" : ""}>{s}</li>)}</ol>}
+      {busy && stage >= 4 && <Ticker />}
       {err && <div className="err" role="alert"><h2 className="serif">{ERRORS[err.code] || ERRORS.UPSTREAM}</h2><p>{err.error}</p></div>}
     </section>
     {!busy && children}

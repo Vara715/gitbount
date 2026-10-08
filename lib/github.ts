@@ -30,20 +30,26 @@ async function avatarData(url: string): Promise<string> {
     return `data:${r.headers.get("content-type") || "image/png"};base64,${buf.toString("base64")}`;
   } catch { return ""; } // poster falls back to a silhouette
 }
-/** Optional GraphQL contribution signals (need GITHUB_TOKEN). Failure is non-fatal. */
+/** Contribution signals (last year) via GraphQL. Required: every profile is scored the same way. */
 async function contributions(login: string) {
-  const token = process.env.GITHUB_TOKEN; if (!token) return null;
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) throw new BountyError("UPSTREAM", "This server has no GITHUB_TOKEN configured, so it can't read contribution data.", 500);
+  let res: Response;
   try {
-    const res = await fetch("https://api.github.com/graphql", {
+    res = await fetch("https://api.github.com/graphql", {
       method: "POST", signal: AbortSignal.timeout(8000),
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "User-Agent": "github-bounty" },
       body: JSON.stringify({ query: `query($l:String!){user(login:$l){contributionsCollection{totalCommitContributions totalPullRequestContributions totalIssueContributions totalPullRequestReviewContributions contributionCalendar{weeks{contributionDays{contributionCount}}}}}}`, variables: { l: login } }),
     });
-    const c = (await res.json())?.data?.user?.contributionsCollection; if (!c) return null;
-    const weeks: any[] = c.contributionCalendar.weeks;
-    const active = weeks.filter((w) => w.contributionDays.some((d: any) => d.contributionCount > 0)).length;
-    return { commits: c.totalCommitContributions, prs: c.totalPullRequestContributions, issues: c.totalIssueContributions, reviews: c.totalPullRequestReviewContributions, activeWeeks: (active / Math.max(1, weeks.length)) * 52 };
-  } catch { return null; }
+  } catch (e) { throw new BountyError((e as Error).name === "TimeoutError" ? "TIMEOUT" : "UPSTREAM", "GitHub did not answer in time.", 504); }
+  if (res.status === 403 || res.status === 429) throw new BountyError("RATE_LIMIT", "GitHub's API rate limit has been reached. Try again later.", 429);
+  const json = await res.json().catch(() => null);
+  if (json?.errors?.some((x: any) => x.type === "RATE_LIMITED")) throw new BountyError("RATE_LIMIT", "GitHub's API rate limit has been reached. Try again later.", 429);
+  const c = json?.data?.user?.contributionsCollection;
+  if (!c) throw new BountyError("UPSTREAM", "GitHub's contribution data is unavailable right now. Try again in a moment.", 502);
+  const weeks: any[] = c.contributionCalendar.weeks;
+  const active = weeks.filter((w) => w.contributionDays.some((d: any) => d.contributionCount > 0)).length;
+  return { commits: c.totalCommitContributions, prs: c.totalPullRequestContributions, issues: c.totalIssueContributions, reviews: c.totalPullRequestReviewContributions, activeWeeks: (active / Math.max(1, weeks.length)) * 52 };
 }
 const yrs = (d: string) => (Date.now() - new Date(d).getTime()) / (365.25 * 864e5);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -75,25 +81,24 @@ export async function buildBounty(raw: string): Promise<BountyResult> {
     const stars = own.reduce((a, r) => a + r.stargazers_count, 0), forks = own.reduce((a, r) => a + r.forks_count, 0);
     const hyg = own.length ? own.filter((r) => r.description && r.license).length / own.length : 0;
     const s: Signals = { stars, forks, followers: u.followers, repos: own.length, recentRepos: recent, languages: langs.size, hygiene: hyg, ageYears: yrs(u.created_at),
-      hasContrib: con ? 1 : 0, commits: con?.commits ?? 0, prs: con?.prs ?? 0, issues: con?.issues ?? 0, reviews: con?.reviews ?? 0, activeWeeks: con?.activeWeeks ?? 0 };
+      commits: con.commits, prs: con.prs, issues: con.issues, reviews: con.reviews, activeWeeks: con.activeWeeks };
     const r = score("profile", s);
     const years = yrs(u.created_at).toFixed(1);
-    const statRows = con
-      ? [["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["COMMITS 1Y", fmt(con.commits)], ["PULL REQUESTS", fmt(con.prs)], ["YEARS AT SEA", years]]
-      : [["REPOS", fmt(own.length)], ["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["LANGUAGES", fmt(langs.size)], ["YEARS AT SEA", years]];
+    const statRows = [["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["COMMITS 1Y", fmt(con.commits)], ["PULL REQUESTS", fmt(con.prs)], ["YEARS AT SEA", years]];
     return { mode: "profile", id: bid(u.login), name: u.name || u.login, handle: u.login, url: u.html_url, avatar: await avatarData(u.avatar_url),
       bounty: r.bounty, score: r.total, tier: r.tier, categories: r.categories, generatedAt: now,
       stats: statRows.map(([label, value]) => ({ label, value })) };
   }
 
-  const [r, langs, rel, contrib] = await Promise.all([
+  const [r, langs, rel, contrib, hasReadme] = await Promise.all([
     gh<any>(`/repos/${p.owner}/${p.repo}`),
     gh<Record<string, number>>(`/repos/${p.owner}/${p.repo}/languages`).catch(() => ({})),
     gh<any[]>(`/repos/${p.owner}/${p.repo}/releases?per_page=100`).catch(() => []),
     gh<any[]>(`/repos/${p.owner}/${p.repo}/contributors?per_page=100`).catch(() => []),
+    gh<any>(`/repos/${p.owner}/${p.repo}/readme`).then(() => true).catch(() => false),
   ]);
   if (r.private) throw new BountyError("NOT_FOUND", "This repository is private.", 404);
-  const hyg = [r.description, r.license, r.has_issues, r.homepage].filter(Boolean).length / 4;
+  const hyg = [r.description, r.license, r.has_issues, r.homepage, hasReadme].filter(Boolean).length / 5;
   const s: Signals = { stars: r.stargazers_count, forks: r.forks_count, watchers: r.subscribers_count ?? r.watchers_count, contributors: contrib.length,
     releases: rel.length, languages: Object.keys(langs).length, hygiene: hyg, ageYears: yrs(r.created_at), recencyDays: (Date.now() - new Date(r.pushed_at).getTime()) / 864e5 };
   const res = score("repo", s);

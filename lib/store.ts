@@ -86,3 +86,14 @@ export async function storageStatus() {
   try { await redis.ping(); return { backend: "redis", ok: true, entries: await redis.zcard(Z.recent) }; }
   catch (e) { return { backend: "redis", ok: false, error: String((e as Error).message).slice(0, 160) }; }
 }
+
+/** Rarity: "Top X% of N bounties". Returns null until the board has enough entries to mean something. */
+export async function rankInfo(bounty: number): Promise<{ topPercent: number; total: number } | null> {
+  const MIN = 20;
+  try {
+    let total = 0, above = 0;
+    if (redis) { total = await redis.zcard(Z.highest); above = await redis.zcount(Z.highest, bounty, "+inf"); }
+    else { const all = await readFile(); total = all.length; above = all.filter((e) => e.bounty >= bounty).length; }
+    return total >= MIN ? { topPercent: Math.max(1, Math.ceil((above / total) * 100)), total } : null;
+  } catch { return null; }
+}
