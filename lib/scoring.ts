@@ -34,10 +34,19 @@ const NOTES: Record<string, string[]> = {
 const note = (k: string, s: number) => NOTES[k][s < 35 ? 0 : s < 70 ? 1 : 2];
 
 /** Signals are pre-normalised by the normaliser; this stays pure and testable. */
-export function score(mode: "profile" | "repo", s: Signals) {
+export function score(mode: "profile" | "repo" | "org", s: Signals) {
   const K = SCORING_CONFIG.k;
   const raw: Record<string, number> =
-    mode === "profile"
+    mode === "org"
+      // Organizations have no personal contribution history: scored on their public repositories as a whole.
+      ? {
+          activity: 0.6 * sat(s.recentRepos, 10) + 0.4 * sat(s.repos, 40),
+          impact: 0.7 * sat(s.stars, K.stars * 4) + 0.3 * sat(s.forks, K.forks * 4),
+          engineering: 0.4 * sat(s.languages, 8) + 0.6 * s.hygiene * 100,
+          community: sat(s.followers, 1000),
+          consistency: 0.7 * sat(s.ageYears, K.age) + 0.3 * sat(s.recentRepos, 6),
+        }
+      : mode === "profile"
       ? {
           activity: 0.3 * sat(s.recentRepos, 6) + 0.1 * sat(s.repos, K.repos) + 0.6 * sat(s.commits + 3 * s.prs + 2 * s.reviews + s.issues, K.contribs),
           impact: 0.7 * sat(s.stars, K.stars) + 0.3 * sat(s.forks, K.forks),

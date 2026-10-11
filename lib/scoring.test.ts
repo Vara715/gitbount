@@ -20,6 +20,10 @@ test("contribution data is rewarded, with diminishing returns", () => {
   const b = score("profile", { ...base, commits: 2000, prs: 60, activeWeeks: 30 }).total;
   assert.ok(a > score("profile", base).total && b > a && b - a < a);
 });
+test("organizations are scored without contribution data", () => {
+  const org = score("org", { ...base, repos: 120, recentRepos: 40, stars: 90000, forks: 12000, followers: 20000, languages: 12, hygiene: 0.8, ageYears: 11 });
+  assert.ok(org.total > 60 && org.bounty > 100_000_000);
+});
 test("tiers ascend", () => { assert.equal(tierFor(0).name, "UNKNOWN"); assert.equal(tierFor(99).name, "LEGENDARY"); });
 test("category shares sum ~ bounty", () => {
   const r = score("repo", { ...base, stars: 900, forks: 100, watchers: 40, contributors: 20, releases: 8, recencyDays: 5, ageYears: 4 });

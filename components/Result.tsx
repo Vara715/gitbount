@@ -41,7 +41,7 @@ export function Result({ r, onReset }: { r: BountyResult; onReset?: () => void }
         <button className="cta ghost" onClick={() => setFlip(!flip)} aria-pressed={flip}>{flip ? "VIEW FRONT" : "FLIP / INSPECT"}</button>
       </div>
       <div className="panel">
-        <p className="mono hint">{r.mode === "repo" ? "REPOSITORY BOUNTY" : "PROFILE BOUNTY"} · {r.id}</p>
+        <p className="mono hint">{r.mode === "repo" ? "REPOSITORY BOUNTY" : r.mode === "org" ? "ORGANIZATION BOUNTY" : "PROFILE BOUNTY"} · {r.id}</p>
         <h2 className="serif name">{r.name}</h2>
         <p className="big serif"><Counter to={r.bounty} /></p>
         <span className="tier serif" style={{ color: r.tier.color }}>{r.tier.name}</span> <b className="mono">SCORE {r.score}</b>

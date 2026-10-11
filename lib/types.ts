@@ -1,4 +1,4 @@
-export type Mode = "profile" | "repo";
+export type Mode = "profile" | "repo" | "org";
 export interface Signals { [k: string]: number }
 export interface Category { key: string; label: string; score: number; weight: number; note: string; share: number }
 export interface Tier { name: string; min: number; color: string; description: string }

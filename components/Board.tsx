@@ -8,7 +8,7 @@ export function Board({ items }: { items: BoardEntry[] }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`https://github.com/${e.handle.split("/")[0]}.png?size=120`} alt="" width={64} height={64} loading="lazy" />
         <div><strong className="serif">{e.handle}</strong><span className="mono">฿ {e.bounty.toLocaleString("en-US")}</span>
-          <em style={{ color: e.tierColor }}>{e.mode === "repo" ? "PROJECT · " : ""}{e.tier}</em></div>
+          <em style={{ color: e.tierColor }}>{e.mode === "repo" ? "PROJECT · " : e.mode === "org" ? "ORG · " : ""}{e.tier}</em></div>
       </Link></li>))}</ul>
   );
 }

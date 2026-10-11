@@ -75,20 +75,23 @@ export async function buildBounty(raw: string): Promise<BountyResult> {
       gh<any>(`/users/${p.owner}`),
       gh<any[]>(`/users/${p.owner}/repos?per_page=100&sort=pushed`),
     ]);
-    // Organizations have no personal contribution history, so they can't get a profile bounty.
-    if (u.type !== "User") throw new BountyError("INVALID", `${u.login} is a GitHub ${u.type === "Organization" ? "organization" : "account type"}, not a person. Try a username, or enter owner/repo to get a repository bounty.`);
-    const con = await contributions(p.owner);
+    const isOrg = u.type === "Organization";
+    if (u.type !== "User" && !isOrg) throw new BountyError("INVALID", `${u.login} is a GitHub ${u.type} account, which can't get a bounty. Try a username, an organization, or owner/repo.`);
+    // Organizations have no personal contribution history; they're scored on their repositories instead.
+    const con = isOrg ? null : await contributions(p.owner);
     const own = repos.filter((r) => !r.fork);
     const langs = new Set(own.map((r) => r.language).filter(Boolean));
     const recent = own.filter((r) => Date.now() - new Date(r.pushed_at).getTime() < 180 * 864e5).length;
     const stars = own.reduce((a, r) => a + r.stargazers_count, 0), forks = own.reduce((a, r) => a + r.forks_count, 0);
     const hyg = own.length ? own.filter((r) => r.description && r.license).length / own.length : 0;
     const s: Signals = { stars, forks, followers: u.followers, repos: own.length, recentRepos: recent, languages: langs.size, hygiene: hyg, ageYears: yrs(u.created_at),
-      commits: con.commits, prs: con.prs, issues: con.issues, reviews: con.reviews, activeWeeks: con.activeWeeks };
-    const r = score("profile", s);
+      commits: con?.commits ?? 0, prs: con?.prs ?? 0, issues: con?.issues ?? 0, reviews: con?.reviews ?? 0, activeWeeks: con?.activeWeeks ?? 0 };
+    const r = score(isOrg ? "org" : "profile", s);
     const years = yrs(u.created_at).toFixed(1);
-    const statRows = [["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["COMMITS 1Y", fmt(con.commits)], ["PULL REQUESTS", fmt(con.prs)], ["YEARS AT SEA", years]];
-    return { mode: "profile", id: bid(u.login), name: u.name || u.login, handle: u.login, url: u.html_url, avatar: await avatarData(u.avatar_url),
+    const statRows = isOrg
+      ? [["REPOS", fmt(own.length)], ["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["LANGUAGES", fmt(langs.size)], ["YEARS AT SEA", years]]
+      : [["STARS", fmt(stars)], ["FORKS", fmt(forks)], ["FOLLOWERS", fmt(u.followers)], ["COMMITS 1Y", fmt(con!.commits)], ["PULL REQUESTS", fmt(con!.prs)], ["YEARS AT SEA", years]];
+    return { mode: isOrg ? "org" : "profile", id: bid(u.login), name: u.name || u.login, handle: u.login, url: u.html_url, avatar: await avatarData(u.avatar_url),
       bounty: r.bounty, score: r.total, tier: r.tier, categories: r.categories, generatedAt: now,
       stats: statRows.map(([label, value]) => ({ label, value })) };
   }
