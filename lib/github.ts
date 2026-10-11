@@ -42,6 +42,7 @@ async function contributions(login: string) {
       body: JSON.stringify({ query: `query($l:String!){user(login:$l){contributionsCollection{totalCommitContributions totalPullRequestContributions totalIssueContributions totalPullRequestReviewContributions contributionCalendar{weeks{contributionDays{contributionCount}}}}}}`, variables: { l: login } }),
     });
   } catch (e) { throw new BountyError((e as Error).name === "TimeoutError" ? "TIMEOUT" : "UPSTREAM", "GitHub did not answer in time.", 504); }
+  if (res.status === 401) throw new BountyError("UPSTREAM", "The server's GitHub token was rejected. Check GITHUB_TOKEN.", 502);
   if (res.status === 403 || res.status === 429) throw new BountyError("RATE_LIMIT", "GitHub's API rate limit has been reached. Try again later.", 429);
   const json = await res.json().catch(() => null);
   if (json?.errors?.some((x: any) => x.type === "RATE_LIMITED")) throw new BountyError("RATE_LIMIT", "GitHub's API rate limit has been reached. Try again later.", 429);
@@ -70,11 +71,13 @@ export async function buildBounty(raw: string): Promise<BountyResult> {
   const bid = (s: string) => "B-" + [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36).toUpperCase().padStart(7, "0");
 
   if (p.mode === "profile") {
-    const [u, repos, con] = await Promise.all([
+    const [u, repos] = await Promise.all([
       gh<any>(`/users/${p.owner}`),
       gh<any[]>(`/users/${p.owner}/repos?per_page=100&sort=pushed`),
-      contributions(p.owner),
     ]);
+    // Organizations have no personal contribution history, so they can't get a profile bounty.
+    if (u.type !== "User") throw new BountyError("INVALID", `${u.login} is a GitHub ${u.type === "Organization" ? "organization" : "account type"}, not a person. Try a username, or enter owner/repo to get a repository bounty.`);
+    const con = await contributions(p.owner);
     const own = repos.filter((r) => !r.fork);
     const langs = new Set(own.map((r) => r.language).filter(Boolean));
     const recent = own.filter((r) => Date.now() - new Date(r.pushed_at).getTime() < 180 * 864e5).length;
